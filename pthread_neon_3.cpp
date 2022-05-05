@@ -5,7 +5,7 @@
 # include <sys/time.h>
 using namespace std;
 
-const int n = 4000;
+const int n = 1000;
 float A[n][n];
 int NUM_THREADS = 7;
 
@@ -79,10 +79,6 @@ void* threadFunc(void* param)
 
 	for (int k = 0; k < n; ++k)
 	{
-		// t_id 为 0 的线程做除法操作，其它工作线程先等待
-		// 这里只采用了一个工作线程负责除法操作，同学们可以尝试采用多个工作线程完成除法操作
-		// 比信号量更简洁的同步方式是使用 barrier
-
 		if (t_id == 0)
 		{
 			for (int j = k + 1; j < n; j++)
@@ -104,7 +100,7 @@ void* threadFunc(void* param)
 		}
 
 
-		//循环划分任务（同学们可以尝试多种任务划分方式）
+		//循环划分任务
 		for (int i = k + 1 + t_id; i < n; i += NUM_THREADS)
 		{
 			//消去
@@ -152,9 +148,6 @@ void* threadFunc_horizontal1(void* param)
 
 	for (int k = 0; k < n; ++k)
 	{
-		// t_id 为 0 的线程做除法操作，其它工作线程先等待
-		// 这里只采用了一个工作线程负责除法操作，同学们可以尝试采用多个工作线程完成除法操作
-		// 比信号量更简洁的同步方式是使用 barrier
 
 		vt = vmovq_n_f32(A[k][k]);
 
@@ -187,7 +180,7 @@ void* threadFunc_horizontal1(void* param)
 		}
 
 
-		//循环划分任务（同学们可以尝试多种任务划分方式）
+		//循环划分任务
 		for (int i = k + 1 + t_id; i < n; i += NUM_THREADS)
 		{
 			//消去
@@ -240,9 +233,6 @@ void* threadFunc_horizontal2(void* param)
 
 	for (int k = 0; k < n; ++k)
 	{
-		// t_id 为 0 的线程做除法操作，其它工作线程先等待
-		// 这里只采用了一个工作线程负责除法操作，同学们可以尝试采用多个工作线程完成除法操作
-		// 比信号量更简洁的同步方式是使用 barrier
 
 		vt = vmovq_n_f32(A[k][k]);
 
@@ -287,7 +277,7 @@ void* threadFunc_horizontal2(void* param)
 			end = k + 1 + each * (t_id + 1);
 		}
 
-		//循环划分任务（同学们可以尝试多种任务划分方式）
+		//循环划分任务
 		for (int i = k + 1 + t_id * each; i < end; i ++)
 		{
 			//消去
@@ -343,9 +333,6 @@ void* threadFunc_vertical1(void* param)
 
 	for (int k = 0; k < n; ++k)
 	{
-		// t_id 为 0 的线程做除法操作，其它工作线程先等待
-		// 这里只采用了一个工作线程负责除法操作，同学们可以尝试采用多个工作线程完成除法操作
-		// 比信号量更简洁的同步方式是使用 barrier
 
 		vt = vmovq_n_f32(A[k][k]);
 
@@ -525,7 +512,7 @@ int main()
 	for (int t_id = 0; t_id < NUM_THREADS; t_id++)
 	{
 		param[t_id].t_id = t_id;
-		pthread_create(&handles[t_id], NULL, threadFunc, (void*)&param[t_id]);
+		pthread_create(&handles[t_id], NULL, threadFunc_horizontal2, (void*)&param[t_id]);
 	}
 
 
