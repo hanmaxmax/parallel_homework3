@@ -81,8 +81,6 @@ void* threadFunc(void* param)
 
 	for (int k = 0; k < n; ++k)
 	{
-		// t_id 为 0 的线程做除法操作，其它工作线程先等待
-		// 这里只采用了一个工作线程负责除法操作，同学们可以尝试采用多个工作线程完成除法操作
 
 		vt=vmovq_n_f32(A[k][k]);
 		if (t_id == 0)
@@ -105,7 +103,7 @@ void* threadFunc(void* param)
 		//第一个同步点
 		pthread_barrier_wait(&barrier_Divsion);
 
-		//循环划分任务（同学们可以尝试多种任务划分方式）
+		//循环划分任务
 		for (int i = k + 1 + t_id; i < n; i += NUM_THREADS)
 		{
 			//消去
