@@ -1,16 +1,21 @@
-#include <pmmintrin.h>
-#include <xmmintrin.h>
-#include <emmintrin.h>
-#include <smmintrin.h>
-#include <tmmintrin.h>
-#include <nmmintrin.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <immintrin.h> //AVX、AVX2
-//#include <windows.h>
 #include <sys/time.h>
+# include <arm_neon.h> // use Neon
 using namespace std;
+
+
+/*
+unsigned int Act[8399][264] = { 0 };
+unsigned int Pas[8399][264] = { 0 };
+
+const int Num = 263;
+const int pasNum = 4535;
+const int lieNum = 8399;
+*/
+
+
 
 /*
 unsigned int Act[23045][722] = { 0 };
@@ -19,14 +24,25 @@ unsigned int Pas[23045][722] = { 0 };
 const int Num = 721;
 const int pasNum = 14325;
 const int lieNum = 23045;
-
 */
+
+/*
 unsigned int Act[37960][1188] = { 0 };
 unsigned int Pas[37960][1188] = { 0 };
 
 const int Num = 1187;
 const int pasNum = 14921;
 const int lieNum = 37960;
+*/
+
+
+unsigned int Act[43577][1363] = { 0 };
+unsigned int Pas[54274][1363] = { 0 };
+
+const int Num = 1362;
+const int pasNum = 54274;
+const int lieNum = 43577;
+
 
 //消元子初始化
 void init_A()
@@ -34,7 +50,7 @@ void init_A()
     //每个消元子第一个为1位所在的位置，就是它所在二维数组的行号
     //例如：消元子（561，...）由Act[561][]存放
     unsigned int a;
-    ifstream infile("act2.txt");
+    ifstream infile("act3.txt");
     char fin[10000] = { 0 };
     int index;
     //从文件中提取行
@@ -67,7 +83,7 @@ void init_P()
 {
     //直接按照磁盘文件的顺序存，在磁盘文件是第几行，在数组就是第几行
     unsigned int a;
-    ifstream infile("pas2.txt");
+    ifstream infile("pas3.txt");
     char fin[10000] = { 0 };
     int index = 0;
     //从文件中提取行
@@ -101,6 +117,8 @@ void init_P()
 
 void f_ordinary()
 {
+    uint32x4_t va_Pas =  vmovq_n_u32(0);
+    uint32x4_t va_Act =  vmovq_n_u32(0);
     bool sign;
     do
     {
@@ -113,18 +131,38 @@ void f_ordinary()
             //每轮处理8个消元子，范围：首项在 i-7 到 i
             for (int j = 0; j < pasNum; j++)
             {
-                //看4535个被消元行有没有首项在此范围内的
+                //看被消元行有没有首项在此范围内的
                 while (Pas[j][Num] <= i && Pas[j][Num] >= i - 7)
                 {
                     int index = Pas[j][Num];
 
                     if (Act[index][Num] == 1)//消元子不为空
                     {
-                        //Pas[j][]和Act[（Pas[j][18]）][]做异或
-                        for (int k = 0; k < Num; k++)
+                        //Pas[j][]和Act[（Pas[j][x]）][]做异或
+                        //*******************SIMD优化部分***********************
+                        //********
+                        int k;
+                        for (k = 0; k+4 <= Num; k+=4)
+                        {
+                            //Pas[j][k] = Pas[j][k] ^ Act[index][k];
+                            va_Pas =  vld1q_u32(& (Pas[j][k]));
+                            va_Act =  vld1q_u32(& (Act[index][k]));
+
+                            va_Pas = veorq_u32(va_Pas,va_Act);
+                            vst1q_u32( &(Pas[j][k]) , va_Pas );
+                        }
+
+                        for( ; k<Num; k++ )
                         {
                             Pas[j][k] = Pas[j][k] ^ Act[index][k];
                         }
+                        //*******
+                        //********************SIMD优化部分***********************
+
+
+
+
+
 
                         //更新Pas[j][18]存的首项值
                         //做完异或之后继续找这个数的首项，存到Pas[j][18]，若还在范围里会继续while循环
@@ -166,10 +204,28 @@ void f_ordinary()
                     if (Act[i][Num] == 1)//消元子不为空
                     {
                         //Pas[j][]和Act[i][]做异或
-                        for (int k = 0; k < Num; k++)
+                        //*******************SIMD优化部分***********************
+                        //********
+                        int k;
+                        for (k = 0; k+4 <= Num; k+=4)
+                        {
+                            //Pas[j][k] = Pas[j][k] ^ Act[index][k];
+                            va_Pas =  vld1q_u32(& (Pas[j][k]));
+                            va_Act =  vld1q_u32(& (Act[i][k]));
+
+                            va_Pas = veorq_u32(va_Pas,va_Act);
+                            vst1q_u32( &(Pas[j][k]) , va_Pas );
+                        }
+
+                        for( ; k<Num; k++ )
                         {
                             Pas[j][k] = Pas[j][k] ^ Act[i][k];
                         }
+                        //*******
+                        //********************SIMD优化部分***********************
+
+
+
 
                         //更新Pas[j][18]存的首项值
                         //做完异或之后继续找这个数的首项，存到Pas[j][18]，若还在范围里会继续while循环
@@ -247,19 +303,6 @@ void f_ordinary()
 
 int main()
 {
-    /*
-    init_A();
-    init_P();
-    double seconds;
-    long long head, tail, freq, noww;
-    QueryPerformanceFrequency((LARGE_INTEGER*)&freq);
-    QueryPerformanceCounter((LARGE_INTEGER*)&head);//开始计时
-    //f_ordinary();
-    f_avx256();
-    QueryPerformanceCounter((LARGE_INTEGER*)&tail);//结束计时
-    seconds = (tail - head) * 1000.0 / freq;//单位 ms
-    cout << seconds << 'ms';
-    */
 
     struct timeval head,tail;
     double seconds;
