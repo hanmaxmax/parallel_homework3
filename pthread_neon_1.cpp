@@ -4,9 +4,9 @@
 # include <arm_neon.h> // use Neon
 using namespace std;
 
-const int n = 500;
+const int n = 1000;
 float A[n][n];
-int worker_count = 5; //工作线程数量
+int worker_count = 7; //工作线程数量
 void init()
 {
 	for (int i = 0; i < n; i++)
