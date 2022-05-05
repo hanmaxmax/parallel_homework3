@@ -4,8 +4,20 @@
 #include <fstream>
 #include <semaphore.h>
 #include <sys/time.h>
-//#include <windows.h>
+# include <arm_neon.h> // use Neon
 using namespace std;
+
+
+/*
+unsigned int Act[8399][264] = { 0 };
+unsigned int Pas[8399][264] = { 0 };
+
+const int Num = 263;
+const int pasNum = 4535;
+const int lieNum = 8399;
+*/
+
+
 
 /*
 unsigned int Act[23045][722] = { 0 };
@@ -14,14 +26,26 @@ unsigned int Pas[23045][722] = { 0 };
 const int Num = 721;
 const int pasNum = 14325;
 const int lieNum = 23045;
-
 */
+
+/*
 unsigned int Act[37960][1188] = { 0 };
 unsigned int Pas[37960][1188] = { 0 };
 
 const int Num = 1187;
 const int pasNum = 14921;
 const int lieNum = 37960;
+*/
+
+
+unsigned int Act[43577][1363] = { 0 };
+unsigned int Pas[54274][1363] = { 0 };
+
+const int Num = 1362;
+const int pasNum = 54274;
+const int lieNum = 43577;
+
+
 
 //线程数定义
 int NUM_THREADS = 7;
@@ -47,7 +71,7 @@ void init_A()
     //每个消元子第一个为1位所在的位置，就是它所在二维数组的行号
     //例如：消元子（561，...）由Act[561][]存放
     unsigned int a;
-    ifstream infile("act2.txt");
+    ifstream infile("act3.txt");
     char fin[10000] = { 0 };
     int index;
     //从文件中提取行
@@ -80,7 +104,7 @@ void init_P()
 {
     //直接按照磁盘文件的顺序存，在磁盘文件是第几行，在数组就是第几行
     unsigned int a;
-    ifstream infile("pas2.txt");
+    ifstream infile("pas3.txt");
     char fin[10000] = { 0 };
     int index = 0;
     //从文件中提取行
@@ -115,6 +139,8 @@ void* threadFunc(void* param)
 {
     threadParam_t* p = (threadParam_t*)param;
     int t_id = p->t_id;
+    uint32x4_t va_Pas =  vmovq_n_u32(0);
+    uint32x4_t va_Act =  vmovq_n_u32(0);
 
     do
     {
@@ -134,10 +160,25 @@ void* threadFunc(void* param)
                     if (Act[index][Num] == 1)//消元子不为空
                     {
                         //Pas[j][]和Act[（Pas[j][18]）][]做异或
-                        for (int k = 0; k < Num; k++)
+                        //*******************SIMD优化部分***********************
+                        //********
+                        int k;
+                        for (k = 0; k+4 <= Num; k+=4)
+                        {
+                            //Pas[j][k] = Pas[j][k] ^ Act[index][k];
+                            va_Pas =  vld1q_u32(& (Pas[j][k]));
+                            va_Act =  vld1q_u32(& (Act[index][k]));
+
+                            va_Pas = veorq_u32(va_Pas,va_Act);
+                            vst1q_u32( &(Pas[j][k]) , va_Pas );
+                        }
+
+                        for( ; k<Num; k++ )
                         {
                             Pas[j][k] = Pas[j][k] ^ Act[index][k];
                         }
+                        //*******
+                        //********************SIMD优化部分***********************
 
                         //更新Pas[j][18]存的首项值
                         //做完异或之后继续找这个数的首项，存到Pas[j][18]，若还在范围里会继续while循环
@@ -178,10 +219,26 @@ void* threadFunc(void* param)
                     if (Act[i][Num] == 1)//消元子不为空
                     {
                         //Pas[j][]和Act[i][]做异或
-                        for (int k = 0; k < Num; k++)
+                        //*******************SIMD优化部分***********************
+                        //********
+                        int k;
+                        for (k = 0; k+4 <= Num; k+=4)
+                        {
+                            //Pas[j][k] = Pas[j][k] ^ Act[index][k];
+                            va_Pas =  vld1q_u32(& (Pas[j][k]));
+                            va_Act =  vld1q_u32(& (Act[i][k]));
+
+                            va_Pas = veorq_u32(va_Pas,va_Act);
+                            vst1q_u32( &(Pas[j][k]) , va_Pas );
+                        }
+
+                        for( ; k<Num; k++ )
                         {
                             Pas[j][k] = Pas[j][k] ^ Act[i][k];
                         }
+                        //*******
+                        //********************SIMD优化部分***********************
+
 
                         //更新Pas[j][18]存的首项值
                         //做完异或之后继续找这个数的首项，存到Pas[j][18]，若还在范围里会继续while循环
@@ -273,6 +330,7 @@ void* threadFunc(void* param)
 
 
     } while (sign == true);
+
 
     pthread_exit(NULL);
 }
